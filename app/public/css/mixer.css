@@ -1,0 +1,32 @@
+/* Componente Mixer (vertical por defecto; la vista decide la orientación). */
+.mixer {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 10px 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+}
+.faders { flex: 1; display: flex; gap: 10px; min-height: 0; }
+.fader { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.fader .track {
+  flex: 1; width: 10px; min-height: 60px;
+  border-radius: 5px; background: #0d0e12; border: 1px solid var(--line);
+  position: relative; overflow: hidden;
+}
+.fader .fill {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: calc(var(--v, 0) * 100%);
+  background: var(--deck); transition: height .08s linear;
+}
+.fader .ch { font-size: 11px; font-weight: 700; color: var(--dim); }
+.xfader { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; color: var(--dim); }
+.xfader .rail { width: 50px; height: 8px; border-radius: 4px; background: #0d0e12; border: 1px solid var(--line); position: relative; }
+.xfader .knob {
+  position: absolute; top: -5px; left: 50%; width: 10px; height: 16px; margin-left: -5px;
+  border-radius: 3px; background: var(--text); transition: left .08s linear;
+}
+
+/* Mixer horizontal (barra) */
+.mixer.row { flex-direction: row; padding: 8px 12px; }
+.mixer.row .faders { flex-direction: row; flex: 1; }
+.mixer.row .fader { flex-direction: row; flex: 1; }
+.mixer.row .fader .track { flex: 1; height: 10px; width: auto; min-height: 0; }
+.mixer.row .fader .fill { top: 0; right: auto; height: 100%; width: calc(var(--v, 0) * 100%); transition: width .08s linear; }
