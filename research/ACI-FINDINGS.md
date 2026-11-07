@@ -45,3 +45,20 @@ Probado: `/Control/ACI/play i:0 i:0 i:0 f:1` arranca el deck 1 y `i:0 i:1 i:0 f:
 Después de muchos reinicios del remote, Serato deja de conectarse o se conecta a puertos
 muertos (ECONNRESET): Bonjour cachea los anuncios viejos. Publicar siempre en el mismo puerto
 (por ejemplo 52976) lo soluciona. Remote Deck ahora usa `REMOTE_PORT` (52976 por defecto).
+
+## Más controles verificados en vivo (2026-11-07)
+| Control | Argumentos | Comportamiento |
+|---|---|---|
+| `sync` | value 1/0 | Activa o desactiva SYNC; Serato confirma con `/Status/ACI/sync`. |
+| `pitch_bend_up` / `pitch_bend_down` | value 1 al presionar, 0 al soltar | Nudge temporal (rate 1.039 mientras se mantiene, vuelve a 1.0). |
+| `pitch_nudge_up` / `_down` | value 1/0 | Cambio **permanente** de pitch fino (no sirve para nudge). |
+| `auto_loop_specific_length` | property = índice de tamaño, value 1 | Activa un auto loop; queda activo al soltar. |
+| `auto_loop_roll_specific_length` | property = índice, value 1/0 | Loop roll mientras se mantiene. |
+| `loop_length_half` / `_double` | value 1 (un pulso) | Actúa con cualquier valor: enviar 1 y 0 avanza dos pasos. |
+| `cue_point` | property = pad (0-7), value 1/0 | Dispara o crea el hot cue. |
+
+Índice de tamaño de loop: `0` = 1/32 beat, y cada paso duplica (`3` = 1/4, `5` = 1, `7` = 4, `10` = 32).
+
+No expuestos por ACI (log: `Tried to inject unmapped ACI message`): `stems`, `vocals`.
+Rechazados como identificadores: `drums`, `melody`, `all_stems`, `stem_fx`.
+`sample_player_slot_play` no dio una respuesta visible con los slots vacíos; falta probarlo con samples cargados.
