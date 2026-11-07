@@ -17,6 +17,10 @@ const path = require('node:path');
 // pueda compilar a un ejecutable con Bun (ver app/build.js).
 const { SeratoRemoteClient, NUM_REMOTE_DECKS, osc, arg } = require('../lib/serato/remote/index.js');
 const { getTrackMetadata } = require('../lib/serato/readers/index.js');
+const { SetHistory } = require('./lib/history.js');
+const { lanAddresses, primaryUrl, qrSvg, qrTerminal, enableUtf8Console, openBrowser } = require('./lib/network.js');
+
+const history = new SetHistory();
 
 const HTTP_PORT = Number(process.env.PORT) || 8080;
 const PEER_NAME = process.env.PEER_NAME || 'Remote Deck';
@@ -111,6 +115,9 @@ async function loadMeta(filePath) {
 const CONTROLS = new Set([
   'play', 'cue', 'cue_point', 'keylock', 'auto_loop_enable',
   'loop_length_half', 'loop_length_double', 'censor', 'reloop',
+  'sync', 'pitch_bend_up', 'pitch_bend_down',
+  'auto_loop_specific_length', 'auto_loop_roll_specific_length',
+  'sample_player_slot_play', 'sample_player_slot_stop',
 ]);
 const sessions = new Set();
 const origAttach = SeratoRemoteClient.prototype.attachSession;
@@ -195,6 +202,8 @@ remote.on('deckChange', async ({ deckId, track }) => {
   const loaded = track && track.valid !== false && (track.title || track.filePath);
   d.track = loaded ? { title: track.title || '', artist: track.artist || '', filePath: track.filePath || '' } : null;
   d.meta = null;
+  history.onLoad(deckId);
+  d.loadedAt = history.loadedAt(deckId);
   broadcast('deck', d);
   watchTrackFiles();
   if (d.track?.filePath) {
@@ -217,6 +226,8 @@ remote.on('playhead', ({ deckId, playhead }) => {
   d.rate = rate;
   d.bpm = bpm;
   const now = Date.now();
+  const played = history.onPlayhead(d);
+  if (played) broadcast('history', history.entries);
   const playingChanged = wasPlaying !== rate > 0.001;
   if (playingChanged || now - (lastSent.get(deckId) || 0) >= PLAYHEAD_MIN_MS) {
     lastSent.set(deckId, now);
@@ -263,6 +274,26 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url.pathname === '/qr.svg') {
+    qrSvg(primaryUrl(HTTP_PORT)).then((svg) => {
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' });
+      res.end(svg);
+    });
+    return;
+  }
+  if (url.pathname === '/info') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ url: primaryUrl(HTTP_PORT) }));
+    return;
+  }
+  if (url.pathname === '/history.txt') {
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Disposition': `attachment; filename="set-${history.key}.txt"`,
+    });
+    res.end(history.toText());
+    return;
+  }
   if (url.pathname === '/events') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -270,7 +301,7 @@ const server = http.createServer((req, res) => {
       Connection: 'keep-alive',
     });
     res.write('retry: 2000\n\n');
-    send(res, 'snapshot', { ...state, t: Date.now() });
+    send(res, 'snapshot', { ...state, history: history.entries, t: Date.now() });
     clients.add(res);
     const ka = setInterval(() => res.write(': ka\n\n'), 15000);
     req.on('close', () => {
@@ -310,14 +341,15 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(HTTP_PORT, '0.0.0.0', () => {
-  console.log('\nRemote Deck listo. Abre en el navegador:');
-  console.log(`  http://localhost:${HTTP_PORT}`);
-  for (const addrs of Object.values(os.networkInterfaces())) {
-    for (const a of addrs || []) {
-      if (a.family === 'IPv4' && !a.internal) console.log(`  http://${a.address}:${HTTP_PORT}`);
-    }
-  }
-  console.log('');
+  const url = primaryUrl(HTTP_PORT);
+  enableUtf8Console();
+  console.log('\n  Remote Deck listo. Escanea el QR con la cámara del celular (misma red Wi-Fi):\n');
+  console.log(qrTerminal(url));
+  console.log(`\n  ➜  ${url}`);
+  for (const a of lanAddresses().slice(1)) console.log(`     http://${a.address}:${HTTP_PORT}  (${a.name})`);
+  console.log(`     http://localhost:${HTTP_PORT}  (este computador)\n`);
+  // Opcional: abrir también el navegador del PC con el QR en grande
+  if (process.env.OPEN_BROWSER) openBrowser(`http://localhost:${HTTP_PORT}/#qr`);
   remote.start().catch((e) => {
     console.error('No se pudo iniciar el remote:', e);
     process.exit(1);

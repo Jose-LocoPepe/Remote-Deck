@@ -1,15 +1,26 @@
 // Componente Deck: un deck completo (cabecera, onda, tiempos, plato,
-// transporte, hot cues, estado de loop). Se dibuja solo cuando cambia su deck.
+// transporte, pitch/sync, pads con modos, estado de loop).
+// Se dibuja solo cuando cambia su deck; `frame` actualiza lo que se mueve.
 import { fmtTime, camelot, fileName, pitchText } from '../format.js';
 import { control, haptic } from '../control.js';
+import { PAD_MODES } from '../pads.js';
+import { prefs } from '../storage.js';
 
 export const DECK_COLORS = ['#2f9bff', '#ff8a2a', '#36d17a', '#e5484d'];
 const RING = 276.46; // 2πr con r=44
 
+const MODE_TABS = Object.entries(PAD_MODES)
+  .map(([k, m]) => `<button class="mode" data-mode="${k}"${m.disabled ? ' disabled' : ''}${m.hint ? ` title="${m.hint}"` : ''}>${m.label}${m.beta ? '<sup>β</sup>' : ''}</button>`)
+  .join('');
+
 const TEMPLATE = `
   <header class="d-head">
     <div class="num"></div>
-    <div class="info"><div class="title">—</div><div class="artist">Sin pista</div></div>
+    <div class="info">
+      <div class="title">—</div>
+      <div class="artist">Sin pista</div>
+    </div>
+    <span class="played" hidden title="Ya sonó en este set">YA TOCADA</span>
     <div class="key"></div>
   </header>
   <div class="d-ov"><canvas></canvas><div class="loopband"></div><div class="playhead"></div></div>
@@ -29,6 +40,12 @@ const TEMPLATE = `
     <button class="btn" data-act="loop_length_double">×2</button>
     <button class="btn keybtn" data-act="keylock">KEY</button>
   </div>
+  <div class="d-pitch">
+    <button class="btn nudge" data-hold="pitch_bend_down" title="Frenar (mantener)">−</button>
+    <button class="btn syncbtn" data-act="sync">SYNC</button>
+    <button class="btn nudge" data-hold="pitch_bend_up" title="Acelerar (mantener)">+</button>
+  </div>
+  <nav class="d-modes">${MODE_TABS}</nav>
   <div class="d-cues"></div>
   <footer class="d-loops">
     <span class="tag auto">LOOP</span><span class="tag roll">ROLL</span><span class="beats"></span>
@@ -43,29 +60,36 @@ export function createDeck(store, id) {
   el.innerHTML = TEMPLATE;
   const q = (s) => el.querySelector(s);
   const r = {
-    num: q('.num'), title: q('.title'), artist: q('.artist'), key: q('.key'),
+    num: q('.num'), title: q('.title'), artist: q('.artist'), key: q('.key'), played: q('.played'),
     canvas: q('canvas'), playhead: q('.playhead'), loopband: q('.loopband'),
     elapsed: q('.elapsed'), remain: q('.remain'), ring: q('.ring'), spin: q('.spin'),
     bpm: q('.bpm b'), pitch: q('.bpm em'), state: q('.state'),
     auto: q('.tag.auto'), roll: q('.tag.roll'), beats: q('.beats'),
-    playbtn: q('.playbtn'), playico: q('.playbtn .ico'), loopbtn: q('.loopbtn'), keybtn: q('.keybtn'),
+    playbtn: q('.playbtn'), playico: q('.playbtn .ico'), loopbtn: q('.loopbtn'), keybtn: q('.keybtn'), syncbtn: q('.syncbtn'),
+    modes: q('.d-modes'), cues: q('.d-cues'),
   };
   r.num.textContent = id;
-  const cuesEl = q('.d-cues');
-  const pads = Array.from({ length: 8 }, (_, i) => {
+  const pads = Array.from({ length: 8 }, () => {
     const b = document.createElement('button');
     b.className = 'cue';
-    b.textContent = i + 1;
-    cuesEl.appendChild(b);
+    r.cues.appendChild(b);
     return b;
   });
   let keylock = false;
+  let sync = false;
   let lastPlaying = null;
+  let mode = PAD_MODES[prefs.get(`padmode-${id}`)] && !PAD_MODES[prefs.get(`padmode-${id}`)].disabled ? prefs.get(`padmode-${id}`) : 'hotcue';
   const deck = () => store.decks[id - 1];
+  const padDef = (b) => PAD_MODES[mode].pads[pads.indexOf(b)];
 
   // ── Interacción ──
   el.addEventListener('contextmenu', (e) => e.preventDefault());
-  const holdTarget = (t) => t.closest('[data-hold], .cue');
+  const holdTarget = (t) => {
+    const b = t.closest('[data-hold], .cue');
+    if (!b) return null;
+    if (b.classList.contains('cue')) return padDef(b)?.hold ? b : null;
+    return b;
+  };
   el.addEventListener('pointerdown', (e) => {
     const b = holdTarget(e.target);
     if (!b) return;
@@ -73,12 +97,12 @@ export function createDeck(store, id) {
     b.setPointerCapture?.(e.pointerId);
     b.classList.add('down');
     haptic();
-    const idx = pads.indexOf(b);
-    b._ctl = idx >= 0 ? ['cue_point', idx] : [b.dataset.hold, 0];
+    const pad = b.classList.contains('cue') ? padDef(b) : null;
+    b._ctl = pad ? [pad.name, pad.prop] : [b.dataset.hold, 0];
     control(id, b._ctl[0], 1, b._ctl[1]);
   });
   const release = (e) => {
-    const b = holdTarget(e.target);
+    const b = e.target.closest('[data-hold], .cue');
     if (!b?._ctl) return;
     b.classList.remove('down');
     control(id, b._ctl[0], 0, b._ctl[1]);
@@ -87,6 +111,28 @@ export function createDeck(store, id) {
   el.addEventListener('pointerup', release);
   el.addEventListener('pointercancel', release);
   el.addEventListener('click', (e) => {
+    const tab = e.target.closest('.mode');
+    if (tab) {
+      if (tab.disabled) return;
+      mode = tab.dataset.mode;
+      prefs.set(`padmode-${id}`, mode);
+      renderPads();
+      return;
+    }
+    const pad = e.target.closest('.cue');
+    if (pad) {
+      const def = padDef(pad);
+      if (!def || def.hold) return; // los de mantener ya se enviaron en pointerdown
+      haptic();
+      const d = deck();
+      if (def.toggleLoop && d.loop.autoLoopOn && d.loop.beatLength === def.beats) {
+        control(id, 'auto_loop_enable', 0);
+      } else {
+        control(id, def.name, 1, def.prop);
+        control(id, def.name, 0, def.prop);
+      }
+      return;
+    }
     const b = e.target.closest('[data-act]');
     if (!b) return;
     haptic();
@@ -100,10 +146,42 @@ export function createDeck(store, id) {
       keylock = !keylock;
       control(id, 'keylock', keylock ? 1 : 0);
       r.keybtn.classList.toggle('on', keylock);
+    } else if (act === 'sync') {
+      sync = !sync;
+      control(id, 'sync', sync ? 1 : 0);
+      r.syncbtn.classList.toggle('on', sync);
     }
   });
 
-  // ── Render: solo cuando cambian pista / metadatos ──
+  // ── Pads según el modo ──
+  function renderPads() {
+    const m = PAD_MODES[mode];
+    for (const t of r.modes.children) t.classList.toggle('on', t.dataset.mode === mode);
+    r.cues.dataset.mode = mode;
+    const d = deck();
+    const cues = d.meta?.cues || [];
+    pads.forEach((p, i) => {
+      const def = m.pads[i];
+      p.textContent = def ? def.label : '';
+      p.disabled = !def;
+      let set = false;
+      let bg = '';
+      let title = '';
+      if (mode === 'hotcue') {
+        const c = cues.find((x) => x.index === i);
+        set = !!c;
+        bg = c?.color || '';
+        title = c?.name || '';
+      } else if (mode === 'loop' && def) {
+        set = !!(d.loop.autoLoopOn && d.loop.beatLength === def.beats);
+      }
+      p.classList.toggle('set', set);
+      p.style.background = bg;
+      p.title = title;
+    });
+  }
+
+  // ── Render: solo cuando cambian pista / metadatos / historial ──
   function render() {
     const d = deck();
     el.classList.toggle('empty', !d.track);
@@ -111,15 +189,18 @@ export function createDeck(store, id) {
     r.artist.textContent = d.track ? d.track.artist || '' : 'Sin pista';
     r.key.textContent = camelot(d.meta?.key);
     r.num.style.boxShadow = d.meta?.color ? `inset 0 -4px 0 ${d.meta.color}` : '';
-    const cues = d.meta?.cues || [];
-    pads.forEach((p, i) => {
-      const c = cues.find((x) => x.index === i);
-      p.classList.toggle('set', !!c);
-      p.style.background = c?.color || '';
-      p.title = c?.name || '';
-    });
+    renderPlayed();
     renderLoop();
     drawOverview();
+  }
+
+  /** Marca "YA TOCADA" si esta pista ya sonó antes en el set. */
+  function renderPlayed() {
+    const d = deck();
+    const fp = d.track?.filePath;
+    const before = fp ? store.history.find((h) => h.filePath === fp && h.at < (d.loadedAt || Infinity)) : null;
+    r.played.hidden = !before;
+    if (before) r.played.title = `Ya sonó a las ${new Date(before.at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}`;
   }
 
   function renderLoop() {
@@ -129,6 +210,7 @@ export function createDeck(store, id) {
     r.loopbtn.classList.toggle('on', !!d.loop.autoLoopOn);
     const b = d.loop.beatLength;
     r.beats.textContent = b ? (b < 1 ? `1/${Math.round(1 / b)}` : `${b}`) : '';
+    renderPads();
   }
 
   function drawOverview() {
@@ -202,5 +284,6 @@ export function createDeck(store, id) {
     }
   }
 
-  return { id, el, render, renderLoop, drawOverview, frame };
+  renderPads();
+  return { id, el, render, renderPlayed, renderLoop, drawOverview, frame };
 }

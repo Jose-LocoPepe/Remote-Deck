@@ -5,9 +5,13 @@ import { LAYOUTS } from './layouts.js';
 import { createDeck } from './components/deck.js';
 import { createMixer } from './components/mixer.js';
 import { createTopbar } from './components/topbar.js';
+import { createHistory } from './components/history.js';
+import { createQr } from './components/qr.js';
 
 const decks = [1, 2, 3, 4].map((id) => createDeck(store, id));
 const mixer = createMixer(store);
+const history = createHistory(store);
+const qr = createQr();
 const stage = document.createElement('main');
 stage.className = 'stage';
 
@@ -24,12 +28,14 @@ const topbar = createTopbar(store, {
     else prefs.set('page', (page = value));
     arrange();
   },
+  onHistory: () => history.open(),
+  onQr: () => qr.open(),
   onLayout(key) {
     prefs.set('layout', (layout = key));
     arrange();
   },
 });
-document.body.append(topbar.el, stage);
+document.body.append(topbar.el, stage, history.el, qr.el);
 
 function arrange() {
   const L = LAYOUTS[layout];
@@ -66,6 +72,10 @@ store.on('status', topbar.setStatus);
 store.on('deck', (id) => decks[id - 1].render());
 store.on('loop', (id) => decks[id - 1].renderLoop());
 store.on('mixer', mixer.render);
+store.on('history', () => {
+  history.render();
+  for (const d of decks) d.renderPlayed();
+});
 
 // Solo se animan los decks visibles.
 function frame() {
@@ -90,5 +100,10 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 
 arrange();
 topbar.setStatus();
+// El servidor abre el navegador del PC en /#qr al arrancar: mostrar el QR de entrada.
+if (location.hash === '#qr') {
+  qr.open();
+  window.history.replaceState(null, '', location.pathname);
+}
 connect();
 requestAnimationFrame(frame);
