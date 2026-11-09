@@ -8,7 +8,7 @@ inversa del protocolo que Serato sigue incluyendo (probado con **Serato DJ Pro 4
   transcurrido/restante, BPM, pitch, loops, upfaders y crossfader.
 - **Control:** play/pausa, CUE, hot cues, loops (auto loop y roll por tamaño), ½ / ×2,
   keylock, SYNC y nudge de pitch.
-- **Modos de pads** como en una controladora: HOT CUE · LOOP · ROLL · SAMPLER (beta).
+- **Modos de pads** como en una controladora: HOT CUE · LOOP · ROLL · SAMPLER · STEMS.
 - **Historial del set con buscador:** "¿ya toqué esta?" en un segundo, aviso
   *YA TOCADA* en el deck y descarga del tracklist.
 - **5 vistas:** Clásica, Horizontal, Compacta, 4 decks y Un deck.
@@ -124,8 +124,8 @@ docs/                  especificación del protocolo
 
 ## Hoja de ruta
 
-- [ ] SAMPLER: verificar el mapeo con samples cargados.
-- [ ] STEMS: Serato no los expone por ACI; requiere más investigación.
+- [x] SAMPLER: deck_set 1, slot en el campo deck.
+- [x] STEMS: silenciar y solo por stem (`codfather_st`, `codfather_st_solo`).
 - [ ] Estado ACI por deck (hoy solo llega el del deck 1).
 - [ ] Explorar la biblioteca y cargar pistas desde el celular.
 - [ ] Indicadores de fraseo (compases, beats hasta el siguiente cue).

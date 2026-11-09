@@ -1,0 +1,95 @@
+==============================================================
+  REMOTE DECK - Cómo usarlo (Windows y Mac)
+  Ve y controla Serato DJ Pro desde el celular
+==============================================================
+
+ANTES DE EMPEZAR
+----------------
+- Serato DJ Pro instalado
+- El computador y el celular conectados a la MISMA red Wi-Fi (sino, comparte el wifi de tu celu a tu pc).
+- Abre solo una copia de Remote Deck a la vez.
+
+
+==============================================================
+  WINDOWS
+==============================================================
+
+1) Instala Bonjour (solo la primera vez)
+   Serato lo usa para encontrar Remote Deck. Descárgalo de:
+   https://support.apple.com/kb/DL999
+
+2) Abre RemoteDeck.exe
+   - Si Windows muestra "Windows protegió su PC", haz clic en
+     "Más información" y después en "Ejecutar de todas formas".
+   - Si el Firewall pregunta, marca "Redes privadas" y permite el acceso.
+
+3) Abre Serato DJ Pro. Se conecta solo en unos segundos.
+
+4) Escanea con el celular el QR que aparece en la ventana negra.
+
+
+==============================================================
+  MAC
+==============================================================
+
+1) Haz doble clic en RemoteDeck-mac.tar.gz: aparece RemoteDeck.app.
+   Arrástrala a la carpeta Aplicaciones (opcional).
+   Sirve para chip Apple (M1, M2...) y para Intel.
+
+2) La primera vez, macOS la bloquea porque no viene de la App Store:
+   - Haz doble clic en RemoteDeck.app y, en el aviso, elige "OK".
+   - Ve a Configuración del Sistema > Privacidad y seguridad.
+   - Abajo aparece "Se bloqueó RemoteDeck": haz clic en "Abrir igualmente".
+   (En macOS 14 o anterior basta con clic derecho en la app > Abrir > Abrir.)
+
+3) Cuando macOS pida permiso de "Red local", acéptalo.
+   Sin ese permiso Serato no encuentra Remote Deck.
+   (En Mac no hace falta instalar Bonjour: ya viene incluido.)
+
+4) Se abre el navegador con el código QR. Abre Serato DJ Pro:
+   se conecta solo en unos segundos. Escanea el QR con el celular.
+
+Las veces siguientes basta con hacer doble clic en RemoteDeck.app.
+Arriba a la derecha, en la barra de menú, aparece el ícono "◉ RD":
+  - Mostrar código QR
+  - Abrir Remote Deck en este Mac
+  - Desconectar y salir
+Si algo falla, revisa el registro en: ~/Library/Logs/RemoteDeck.log
+
+Alternativa por Terminal (sueltos RemoteDeck-mac-arm64 / -x64):
+     xattr -d com.apple.quarantine RemoteDeck-mac-arm64
+     chmod +x RemoteDeck-mac-arm64
+     ./RemoteDeck-mac-arm64
+
+
+==============================================================
+  EN EL CELULAR
+==============================================================
+
+- Para usarla como app:
+  iPhone: Compartir > "Agregar a pantalla de inicio".
+  Android: menú de Chrome > "Agregar a pantalla principal".
+- El ícono de cuadrícula arriba cambia la vista (2 decks, 4 decks, etc.).
+- La lupa abre el historial del set: busca si ya tocaste una canción.
+- Botones de modo de los pads:
+    HOT CUE  ->  hot cues 1 a 8
+    LOOP     ->  loop automático según tamaño (tócalo de nuevo para quitarlo)
+    ROLL     ->  loop roll mientras mantienes el pad
+    SAMPLER  ->  dispara los slots 1-8 del sampler
+    STEMS    ->  fila de arriba: silencia o devuelve vocals / bass / drums / melody
+                 fila de abajo: deja sonar solo ese stem mientras lo mantienes
+
+
+==============================================================
+  PROBLEMAS COMUNES
+==============================================================
+
+- Se queda en "Esperando a Serato...":
+  Reinicia Serato. En Windows, revisa que Bonjour esté instalado.
+- El celular no abre la página:
+  Revisa que esté en la misma red Wi-Fi que el computador.
+  En Windows, permite Remote Deck en el Firewall (redes privadas).
+- No se ven la forma de onda ni los cues en pistas de streaming:
+  Es normal: esas pistas no tienen un archivo local que leer.
+- No veo los cambios después de actualizar:
+  Cierra y vuelve a abrir la app en el celular.
