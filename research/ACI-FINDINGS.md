@@ -62,3 +62,48 @@ muertos (ECONNRESET): Bonjour cachea los anuncios viejos. Publicar siempre en el
 No expuestos por ACI (log: `Tried to inject unmapped ACI message`): `stems`, `vocals`.
 Rechazados como identificadores: `drums`, `melody`, `all_stems`, `stem_fx`.
 `sample_player_slot_play` no dio una respuesta visible con los slots vacíos; falta probarlo con samples cargados.
+
+## Mapa de controles inyectables (Ghidra, Serato DJ Pro 4.0.2)
+
+`/Control/ACI/<nombre>` solo acepta nombres de un mapa nombre→id que arma el
+inicializador estático `FUN_1403b0320` (1418 entradas de 0x28 bytes, copiadas a la
+lista global `0x144015090`). La consulta es `FUN_141570630`: si el nombre no está,
+el manejador `FUN_1415a3f10` registra *"Tried to inject unmapped ACI message"*.
+
+Los nombres están cifrados en `.rdata`: `c = rotr8(b ^ 0xE7, i & 7)`, con i como posición del byte.
+La lista completa está en [`aci-inject-map-4.0.2.tsv`](aci-inject-map-4.0.2.tsv) (id, nombre).
+
+Consecuencias:
+- `stems` y `vocals` **no** están en el mapa (por eso el error "unmapped"). La tabla
+  `vocals/bass/drums/melody` (`FUN_140404f30`) es interna, con índices 0-3.
+- Sí existen, y quedan **por probar**: `stems_acapella_set_state`, `stems_instrumental_set_state`,
+  `stems_all_set_state`, `stem_split_control`, `stem_slip`, `stems_levels_enable`,
+  `extract_stem_to_target_deck` y `stem_fx_plus_*`.
+- Biblioteca: `library_scroll`, `fast_library_scroll`, `library_search_text_set`
+  (probablemente `,s`), `tab_library`, `load_track`, `load_uri`, `load_uri_string`
+  y `undo_load_track`.
+- Otros: `beat_jump`, `beat_jump_length_specific`, `beat_num`, `next_beat_after`,
+  `display_beat_position_indicator` (fraseo) y todo `sample_player_*`.
+
+### Stems: verificado en vivo (4.0.2, deck 1)
+| Control | Args `(set, deck, prop, v)` | Efecto observado |
+|---|---|---|
+| `stems_acapella_set_state` | `0, d, 0, 1/0` | activa o quita el modo acapella (`stems_all_set_state` pasa a 0 y vuelve a 1) |
+| `stems_instrumental_set_state` | `0, d, 0, 1/0` | activa o quita el modo instrumental |
+| `stem_split_control` | `0, d, stem, 1/0` | con 1 cambia el stem (0 vocals, 1 bass, 2 drums, 3 melody), con 0 lo restaura |
+
+Estado: suscribirse a `stems_all_set_state`, `stems_playing` y `stems_audio_loaded` (este último indica que la pista tiene stems).
+
+**Corrección:** `stem_split_control` es *Stem Split*: deja las voces en el deck y manda la instrumental al deck pareado. `prop` se ignora. Los stems individuales se controlan así (verificado en vivo):
+
+| Control | Args | Efecto |
+|---|---|---|
+| `codfather_st` | `0, d, stem, 1` | cada pulso silencia o devuelve el stem (0 vocals, 1 bass, 2 drums, 3 melody) |
+| `codfather_st_solo` | `0, d, stem, 1/0` | con 1 suena solo ese stem; con 0 vuelve todo |
+
+Los ids internos por stem (1707, 1709) no están en el mapa inyectable.
+
+### Sampler: verificado en vivo
+`sample_player_slot_play` / `sample_player_slot_stop`: **`(1, slot, 0, 1)`**, con deck_set = 1 y el slot 0-7 en el campo *deck*.
+Con deck_set 0 Serato acepta el mensaje, pero no hace nada; con deck_set 2 o 3 responde "Cant broadcast - invalid key".
+El manejador de estado está en `FUN_14061bad0` (casos 0x3bf-0x3d8).
