@@ -1,5 +1,6 @@
 // Vistas disponibles. `count` = decks visibles; `mixer` = muestra el mixer.
 export const LAYOUTS = {
+  remote: { label: 'Remote', hint: 'Estilo Serato Remote clásico', count: 2, mixer: false, icon: 'M3 4h18v7H3zM3 13h18v7H3z' },
   classic: { label: 'Clásica', hint: 'Dos decks lado a lado', count: 2, mixer: true, icon: 'M3 5h7v14H3zM14 5h7v14h-7z' },
   horizontal: { label: 'Horizontal', hint: 'Ondas apiladas, a lo ancho', count: 2, mixer: true, icon: 'M3 4h18v6H3zM3 14h18v6H3z' },
   compact: { label: 'Compacta', hint: 'Solo tiempo y controles grandes', count: 2, mixer: false, icon: 'M3 6h18v4H3zM3 14h18v4H3z' },

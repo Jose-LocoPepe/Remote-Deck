@@ -11,7 +11,8 @@
     "release": "bun app/build.js",
     "release:win": "bun app/build.js windows",
     "release:mac": "bun app/build.js darwin",
-    "probe": "node research/aci-probe.js"
+    "probe": "node research/aci-probe.js",
+    "icons": "node app/icons/make-icons.js"
   },
   "engines": {
     "node": ">=22.0.0"

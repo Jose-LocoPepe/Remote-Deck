@@ -80,6 +80,7 @@ export function createDeck(store, id) {
   let lastPlaying = null;
   let mode = PAD_MODES[prefs.get(`padmode-${id}`)] && !PAD_MODES[prefs.get(`padmode-${id}`)].disabled ? prefs.get(`padmode-${id}`) : 'hotcue';
   const deck = () => store.decks[id - 1];
+  const stemsOn = new Set(); // stems silenciados (estado local)
   const padDef = (b) => PAD_MODES[mode].pads[pads.indexOf(b)];
 
   // ── Interacción ──
@@ -125,8 +126,17 @@ export function createDeck(store, id) {
       if (!def || def.hold) return; // los de mantener ya se enviaron en pointerdown
       haptic();
       const d = deck();
+      if (def.toggle) {
+        const k = def.name + ':' + def.prop;
+        const on = !stemsOn.has(k);
+        on ? stemsOn.add(k) : stemsOn.delete(k);
+        control(id, def.name, def.pulse ? 1 : on ? 1 : 0, def.prop);
+        renderPads(); return;
+      }
       if (def.toggleLoop && d.loop.autoLoopOn && d.loop.beatLength === def.beats) {
         control(id, 'auto_loop_enable', 0);
+      } else if (def.pulse) {
+        control(id, def.name, 1, def.prop);
       } else {
         control(id, def.name, 1, def.prop);
         control(id, def.name, 0, def.prop);
@@ -172,6 +182,8 @@ export function createDeck(store, id) {
         set = !!c;
         bg = c?.color || '';
         title = c?.name || '';
+      } else if (mode === 'stems' && def?.toggle) {
+        set = stemsOn.has(def.name + ':' + def.prop);
       } else if (mode === 'loop' && def) {
         set = !!(d.loop.autoLoopOn && d.loop.beatLength === def.beats);
       }

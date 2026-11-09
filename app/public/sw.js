@@ -1,13 +1,14 @@
 // Service worker mínimo: guarda la interfaz para que abra rápido.
 // Red primero (siempre la versión más nueva); caché solo si no hay conexión.
 // Los datos en vivo (/events) y los controles (/control) nunca se cachean.
-const CACHE = 'remotedeck-v3';
+const CACHE = 'remotedeck-v11';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'icon.svg',
   'css/base.css', 'css/deck.css', 'css/mixer.css', 'css/layouts.css',
   'js/main.js', 'js/state.js', 'js/control.js', 'js/format.js', 'js/layouts.js', 'js/storage.js',
   'js/pads.js', 'js/components/deck.js', 'js/components/mixer.js', 'js/components/topbar.js',
   'js/components/history.js', 'js/components/qr.js', 'css/sheet.css',
+  'js/components/remote.js', 'css/remote.css',
 ];
 
 self.addEventListener('install', (e) => {

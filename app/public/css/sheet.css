@@ -107,3 +107,6 @@
   .d-pitch .btn { height: 26px; }
   .mode { padding: 3px 5px; }
 }
+.d-cues[data-mode="stems"] .cue { font-size: clamp(9px, 2.6cqi, 12px); color: var(--accent); }
+.d-cues[data-mode="stems"] .cue.set { opacity: .45; text-decoration: line-through; }
+.d-cues[data-mode="stems"] .cue.down { background: var(--accent); color: #fff; }

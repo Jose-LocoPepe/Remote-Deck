@@ -27,13 +27,16 @@ export const PAD_MODES = {
   },
   sampler: {
     label: 'SAMPLER',
-    beta: true,
-    pads: Array.from({ length: 8 }, (_, i) => ({ label: `S${i + 1}`, name: 'sample_player_slot_play', prop: i, hold: false })),
+    // Slots 1-8 del sample player (deck_set 1; el servidor arma el mensaje). Un toque = disparar.
+    pads: Array.from({ length: 8 }, (_, i) => ({ label: `S${i + 1}`, name: 'sample_player_slot_play', prop: i, pulse: true })),
   },
   stems: {
     label: 'STEMS',
-    disabled: true,
-    hint: 'Serato no expone los stems por el protocolo Remote (pendiente de investigar).',
-    pads: [],
+    // Fila 1: silenciar/devolver cada stem (codfather_st, cada pulso alterna).
+    // Fila 2: solo mientras se mantiene (codfather_st_solo). prop 0-3 = vocals, bass, drums, melody.
+    pads: [
+      ...['VOCALS', 'BASS', 'DRUMS', 'MELODY'].map((label, i) => ({ label, name: 'codfather_st', prop: i, toggle: true, pulse: true })),
+      ...['SOLO V', 'SOLO B', 'SOLO D', 'SOLO M'].map((label, i) => ({ label, name: 'codfather_st_solo', prop: i, hold: true })),
+    ],
   },
 };

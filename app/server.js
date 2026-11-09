@@ -15,9 +15,10 @@ const os = require('node:os');
 const path = require('node:path');
 // Importa solo el protocolo y los lectores de tags (sin SQLite), para que se
 // pueda compilar a un ejecutable con Bun (ver app/build.js).
-const { SeratoRemoteClient, NUM_REMOTE_DECKS, osc, arg } = require('../lib/serato/remote/index.js');
+const { SeratoRemoteClient, NUM_REMOTE_DECKS, DEFAULT_SUBSCRIPTION_TOPICS, osc, arg } = require('../lib/serato/remote/index.js');
 const { getTrackMetadata } = require('../lib/serato/readers/index.js');
 const { SetHistory } = require('./lib/history.js');
+const QRCode = require('qrcode');
 const { lanAddresses, primaryUrl, qrSvg, qrTerminal, enableUtf8Console, openBrowser } = require('./lib/network.js');
 
 const history = new SetHistory();
@@ -118,11 +119,18 @@ const CONTROLS = new Set([
   'sync', 'pitch_bend_up', 'pitch_bend_down',
   'auto_loop_specific_length', 'auto_loop_roll_specific_length',
   'sample_player_slot_play', 'sample_player_slot_stop',
+  'codfather_st', 'codfather_st_solo',
+  'upfader', 'crossfader',
+  'library_scroll', 'load_track', 'cue_point_delete', 'quantize',
+  'sample_player_volume', 'sample_player_bank_select',
+  'effect_slot_enable', 'effect_slot_parameter_1', 'effect_bank_beats_multiplier_step',
 ]);
 const sessions = new Set();
+const fxBeats = [4, 4]; // índice de beats por unidad FX (de /Status/FX/Slot/BeatsIndex)
 const origAttach = SeratoRemoteClient.prototype.attachSession;
 SeratoRemoteClient.prototype.attachSession = function (session) {
   sessions.add(session);
+  session.on('status', (m) => { if (m.address === '/Status/FX/Slot/BeatsIndex') fxBeats[m.args[0].value] = m.args[1].value; });
   session.on('closed', () => sessions.delete(session));
   return origAttach.call(this, session);
 };
@@ -142,7 +150,22 @@ function sendControl({ deck, name, prop = 0, value = 1 }) {
   if (!CONTROLS.has(name)) throw new Error('control no permitido');
   const d = Number(deck);
   if (!Number.isInteger(d) || d < 1 || d > NUM_REMOTE_DECKS) throw new Error('deck inválido');
-  const msg = osc(`/Control/ACI/${name}`, arg.i(0), arg.i(d - 1), arg.i(Number(prop) | 0), arg.f(Number(value) || 0));
+  // El sampler no es por deck: deck_set 1 y el slot (0-7) va en el campo deck.
+  const sampler = name.startsWith('sample_player_slot_');
+  // FX: protocolo clásico de Serato Remote, /Control/FX/Slot/<campo> ,if = (unidad 0/1, valor).
+  const fx = name.startsWith('effect_');
+  const u = d - 1;
+  const fxMsg = () => {
+    if (name === 'effect_slot_enable') return osc('/Control/FX/Slot/Enabled', arg.i(u), arg.f(Number(value) ? 1 : 0));
+    if (name === 'effect_slot_parameter_1') return osc('/Control/FX/Slot/Value', arg.i(u), arg.f(Math.max(0, Math.min(1, Number(value) || 0))));
+    fxBeats[u] = Math.max(0, Math.min(10, (fxBeats[u] ?? 4) + (Number(value) < 0 ? -1 : 1)));
+    return osc('/Control/FX/Slot/BeatsIndex', arg.i(u), arg.f(fxBeats[u]));
+  };
+  const msg = fx
+    ? fxMsg()
+    : sampler
+    ? osc(`/Control/ACI/${name}`, arg.i(1), arg.i(Number(prop) | 0), arg.i(0), arg.f(Number(value) || 0))
+    : osc(`/Control/ACI/${name}`, arg.i(0), arg.i(d - 1), arg.i(Number(prop) | 0), arg.f(Number(value) || 0));
   for (const s of sessions) s.send(msg);
   if (name === 'cue_point' && Number(value) === 1) reflectHotCue(state.decks[d - 1], Number(prop) | 0);
   return sessions.size;
@@ -151,7 +174,8 @@ function sendControl({ deck, name, prop = 0, value = 1 }) {
 // Puerto TCP fijo: Bonjour cachea anuncios viejos y Serato se queda intentando
 // puertos muertos; con un puerto estable siempre llega a este servidor.
 const REMOTE_PORT = Number(process.env.REMOTE_PORT) || 52976;
-const remote = new SeratoRemoteClient({ peerName: PEER_NAME, port: REMOTE_PORT });
+const remote = new SeratoRemoteClient({ peerName: PEER_NAME, port: REMOTE_PORT,
+  subscribeTopics: [...DEFAULT_SUBSCRIPTION_TOPICS, '/Register/Status/FX/Slot/BeatsIndex'] });
 
 remote.on('ready', ({ instanceName, port }) => {
   state.status.advertising = true;
@@ -278,6 +302,14 @@ const server = http.createServer((req, res) => {
     qrSvg(primaryUrl(HTTP_PORT)).then((svg) => {
       res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' });
       res.end(svg);
+    });
+    return;
+  }
+  if (url.pathname === '/qr.png') {
+    // Para el menú de la barra de macOS (NSImage no siempre lee SVG)
+    QRCode.toBuffer(primaryUrl(HTTP_PORT), { type: 'png', width: 440, margin: 2 }).then((png) => {
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' });
+      res.end(png);
     });
     return;
   }
