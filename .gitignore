@@ -23,3 +23,5 @@ npm-debug.log*
 
 # Lock files (use parent repo's)
 package-lock.json
+release/
+app/.bundle-entry.js

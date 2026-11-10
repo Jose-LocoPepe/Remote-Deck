@@ -103,6 +103,18 @@ coalesced into one. (This is what `serato-connect`'s `FrameReader` +
 | TXT records   | **empty** — no key/value pairs are published. Serato accepts a bare advert. Any version negotiation must occur in the OSC handshake.                                 |
 | Instance name | `<peer name> @ <hostname>` (e.g. `MyApp @ studio.local`) — the literal `@` and surrounding spaces appear to be convention; uniqueness is provided by hostname suffix |
 
+### 2.1.1 Windows: Apple Bonjour is required
+
+Serato DJ Pro on Windows does not ship its own mDNS stack. It loads Apple's
+`dnssd.dll` at startup (`BonjourServiceDiscovery`, calling `DNSServiceBrowse` /
+`DNSServiceResolve`). If Apple Bonjour is not installed (no
+`C:\Windows\System32\dnssd.dll`, no "Bonjour Service"), Serato never browses for
+`_SeratoIOSRemote._tcp`. The remote's advert then goes unseen and no TCP
+connection arrives. Install Bonjour Print Services for Windows (or iTunes), then
+restart Serato. Verified live on Serato DJ Pro 4.0.2.338 for Windows
+(2026-11-07): after installing Bonjour, the full auth → pair → status flow works
+unchanged, and the sentinel and both MD5 secrets are byte-identical to 3.3.5.
+
 ### 2.2 Roles
 
 The "**remote**" endpoint (originally the Serato Remote iOS app; in this

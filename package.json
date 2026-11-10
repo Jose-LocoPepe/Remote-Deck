@@ -34,7 +34,9 @@
     "watch": "tsc --build tsconfig.json -w",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build && npm test",
-    "demo": "npm run build && node examples/monitor.js"
+    "demo": "npm run build && node examples/monitor.js",
+    "app": "npm run build && node app/server.js",
+    "release": "npm run build && bun app/build.js"
   },
   "engines": {
     "node": ">=22.0.0"
